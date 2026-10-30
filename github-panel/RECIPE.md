@@ -95,6 +95,9 @@ titled in 11px `dim`):
   and up to three failed check names; clicking it runs `space.select` on that space) or `CI passed ·
   #12` (success, 6 s). Nothing is notified for checks already done when it first looks.
 - A click on the badge opens the first failed check, else the PR's checks page.
+- Every link goes through `safeUrl` (`urls.js`) before `open -- <url>` (`open.js`): only `https:`
+  passes. A check's details URL is set by whoever runs that CI, so a failed check whose link isn't
+  https opens the PR's checks page instead; other links do nothing.
 - `Agent` opens the dialog without opening the browser. In it, Enter in the branch field starts.
   Start makes a worktree at `~/.herdr/worktrees/<repo>/<branch, slashes as dashes>` on the space's
   machine (Herdr's own worktree path, so the spaces sidebar nests it and Herdr's worktree dialog
@@ -117,7 +120,7 @@ titled in 11px `dim`):
   button in a cloned layout.
 - `mods/github/main.js` picks the view from `props().view` (the first `init` argument doesn't carry
   layout props): `panel.js` (the list, a plain class) or `ci.js` (the badge). Both import
-  `checks.js` (`summarizeChecks`, `finishedState`, `checksIcon`): a mod can't import another mod's
+  `checks.js` (`summarizeChecks`, `finishedState`, `checksIcon`) and `open.js`: a mod can't import another mod's
   files, so one mod with two views shares them. The PR list adds `statusCheckRollup` to its fields.
 - `mods/issue-agent/main.js`: the dialog, a `View` opened with `openOverlay({ mod: "issue-agent",
   kind: "dialog", width: 480, height: 620, props: { issue: { number, title, labels }, cwd, on } })`.
@@ -175,7 +178,7 @@ titled in 11px `dim`):
 - Switching to a space that isn't a repo shows `Not a git repository`.
 - `herdr-app do github.issues` with the panel shown switches it to the Issues tab.
 - In a space on a PR's branch, the badge shows that PR's number and its checks; PR rows show `✓`/`✗`/`●`.
-- `node --test` passes (`summarizeChecks` and `finishedState`).
+- `node --test` passes (`summarizeChecks`, `finishedState`, `safeUrl`).
 - `github.sort` once on a large repo shows its oldest open issues first, months old.
 - `github.labels` shows the repo's labels in their colors.
 - `herdr-app check mods/issue-agent` passes (it renders a placeholder without props).

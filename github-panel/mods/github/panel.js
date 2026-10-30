@@ -2,6 +2,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { spaces, panes, focused, exec, theme, nextCommand, openOverlay } from "herdr";
 import { summarizeChecks, checksIcon } from "./checks.js";
+import { openUrl } from "./open.js";
 
 const REFRESH_MS = 60000;
 const LIMIT = "50";
@@ -141,10 +142,6 @@ export class Panel {
     return this.filters.sort !== SORTS[0] || this.filters.labels.size > 0 || Boolean(this.filters.text);
   }
 
-  openUrl(url) {
-    exec("open", [url]).catch(() => {});
-  }
-
   tabButton(kind, t) {
     const active = this.tab === kind, count = this.items[kind].length;
     return h_flex().id(`gh-tab-${kind}`).h(26).px(10).gap(6).items_center().rounded(7).cursor_pointer()
@@ -214,7 +211,7 @@ export class Panel {
     const meta = this.tab === "prs" ? this.prMeta(item, t) : this.issueMeta(item, t);
     const date = item[this.filters.sort.date] ?? item.updatedAt;
     return v_flex().id(`gh-${this.tab}-${item.number}`).flex_none().px(10).py(7).gap(3).rounded(7).cursor_pointer()
-      .hover((s) => s.bg(t.hover)).on_click(() => this.openUrl(item.url))
+      .hover((s) => s.bg(t.hover)).on_click(() => openUrl(item.url))
       .child(h_flex().gap(8).items_center()
         .child(div().flex_none().text_size(11).text_color(t.accent).child(`#${item.number}`))
         .child(div().flex_1().min_w(0).truncate().child(item.title))

@@ -2,6 +2,8 @@ import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, panes, exec, theme, notify } from "herdr";
 import { summarizeChecks, finishedState } from "./checks.js";
+import { safeUrl } from "./urls.js";
+import { openUrl } from "./open.js";
 
 const FAST_MS = 30000;
 const SLOW_MS = 90000;
@@ -30,10 +32,6 @@ async function loadPr(folder, on) {
   if (r.code !== 0) return null;
   const pr = JSON.parse(r.stdout);
   return { number: pr.number, title: pr.title, url: pr.url, checks: summarizeChecks(pr.statusCheckRollup) };
-}
-
-function openUrl(url) {
-  exec("open", [url]).catch(() => {});
 }
 
 // The status-bar badge for the shown space; notifies when any space's checks finish.
@@ -73,7 +71,7 @@ export class CiBadge {
 
   badge(pr, t) {
     const { state, failed, passed, total } = pr.checks;
-    if (state === "fail") return { color: t.ansi1, text: `CI ✗ ${failed.length} failed`, url: failed[0].url ?? `${pr.url}/checks` };
+    if (state === "fail") return { color: t.ansi1, text: `CI ✗ ${failed.length} failed`, url: safeUrl(failed[0].url) ?? `${pr.url}/checks` };
     if (state === "pending") return { color: t.working, text: `CI ${passed}/${total}`, url: `${pr.url}/checks`, spin: true };
     if (state === "pass") return { color: t.ansi2, text: "CI ✓ passed", url: `${pr.url}/checks` };
     return { color: t.dim, text: "CI · no checks", url: pr.url };
