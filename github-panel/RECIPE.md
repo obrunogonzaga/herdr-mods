@@ -18,6 +18,14 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
   and its count at 10px in `dim`. The chosen one is `foreground` on `selected`; the other is
   `muted`. Both get `hover` under the pointer. On the right a `Refresh` button, 11px `muted`,
   26px tall, radius 7; while a load runs it reads `…`.
+- **Filter bar**, 38px tall, 8px side padding, 6px gaps, a 1px `border` line under it. A sort chip
+  (`Newest ↕`, `Oldest ↕`, `Updated ↕`), a `Labels` chip (`Labels · 2` with two picked), a search
+  field filling the rest (24px, radius 6, placeholder `Search, then Enter`, its border `accent`
+  while a search applies) and, when anything differs from the default, `Clear`. Chips are 24px,
+  8px side padding, radius 6, 11px; active ones `selected`/`foreground`, others `raised`/`muted`.
+- **Label picker**, under the bar while `Labels` is open: the repo's labels as 20px pills wrapping,
+  up to 132px tall then scrolling; each has a 1px border in its GitHub color (53% alpha when off),
+  and when picked a 27% fill of that color and `foreground` text.
 - **The list**, scrolling, 6px padding, rows 2px apart. Each row is two lines on a radius 7
   card, 10px side and 7px vertical padding, 3px between lines, `hover` under the pointer:
   - Line one: `#5610` at 11px in `accent`, an 8px gap, then the title in `foreground`,
@@ -27,7 +35,8 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
     (`draft` in `dim`, `approved` in `ansi2`, `changes` in `ansi1`, otherwise `review` in
     `blocked`); for an issue, up to three labels, each a pill with 5px side padding, radius 4,
     a 1px border in the label's own GitHub color at 53% alpha and text in `muted`. On the
-    right: `author · 2d` (`m`, `h` or `d` since the last update).
+    right: `author · 2d` (`m`, `h` or `d` since it was opened, or since its last update when
+    sorted by `Updated`).
 - In place of the list, at 8px padding: `Loading…` before the first load; `No open pull
   requests` or `No open issues` when empty; `Not a git repository`, `No GitHub remote in this
   repo`, `Run gh auth login first` or gh's first error line in `ansi1` when it fails.
@@ -59,6 +68,13 @@ titled in 11px `dim`):
   folder), on that space's machine. Switching space or focus re-renders and reloads at once.
 - PRs and issues load together, up to 50 of each, open only. The list reloads every 60 s and
   on `Refresh`.
+- Sorting and filtering happen on GitHub, not on the loaded rows, so `Oldest` reaches issues past
+  the newest 50: `--search "sort:<created-desc|created-asc|updated-desc> <text>"` plus one `--label`
+  per picked label (an item must have all of them). The sort chip cycles; a label click toggles it;
+  Enter in the field applies the text and emptying it clears it; `Clear` resets all three. Each
+  change reloads at once; an older load that finishes late is dropped.
+- Filters apply to both tabs and last while the panel is open. Switching to another repo drops the
+  label picks and loads that repo's labels (`gh label list --limit 200`).
 - A click on a row runs `open <url>` on this computer, so the browser opens even for a space on
   a remote machine.
 - The tab choice is not saved.
@@ -72,7 +88,8 @@ titled in 11px `dim`):
   and open a PR with `Closes #12`, and not merge or deploy. The new space is shown.
 - The dialog remembers the last agent, model and reasoning (shared `issue-agent.last`) and caches
   each machine's model lists for an hour (shared `issue-agent.models`).
-- Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
+- Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads,
+  `github.sort` cycles the sort, `github.labels` opens or closes the label picker. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
 
 ## Built from
 
@@ -130,6 +147,8 @@ titled in 11px `dim`):
 - Clicking a row opens that PR or issue in the browser.
 - Switching to a space that isn't a repo shows `Not a git repository`.
 - `herdr-app do github.issues` with the panel shown switches it to the Issues tab.
+- `github.sort` once on a large repo shows its oldest open issues first, months old.
+- `github.labels` shows the repo's labels in their colors.
 - `herdr-app check mods/issue-agent` passes (it renders a placeholder without props).
 - `Agent` on an issue, Claude Code, `haiku`, `low`, Start: a new space opens on
   `~/.herdr/worktrees/<repo>/feat-<n>-…`, Claude shows `Haiku … with low effort`, and the task is

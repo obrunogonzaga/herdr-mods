@@ -1,13 +1,19 @@
 import { View, div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { spaces, panes, focused, exec, theme, nextCommand, openOverlay } from "herdr";
 
 const REFRESH_MS = 60000;
 const LIMIT = "50";
 const KINDS = {
-  prs: { label: "PRs", args: ["pr", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,isDraft,updatedAt,reviewDecision,headRefName"] },
-  issues: { label: "Issues", args: ["issue", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,labels,updatedAt"] },
+  prs: { label: "PRs", args: ["pr", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,isDraft,createdAt,updatedAt,reviewDecision,headRefName,labels"] },
+  issues: { label: "Issues", args: ["issue", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,labels,createdAt,updatedAt"] },
 };
+// Sorted by GitHub's search, so "Oldest" reaches past the newest 50.
+const SORTS = [
+  { id: "created-desc", label: "Newest", date: "createdAt" },
+  { id: "created-asc", label: "Oldest", date: "createdAt" },
+  { id: "updated-desc", label: "Updated", date: "updatedAt" },
+];
 
 function location() {
   const space = spaces().find((s) => s.active), f = focused();
@@ -38,15 +44,24 @@ function friendlyError(output) {
   return output.trim().split("\n")[0];
 }
 
-async function loadList(kind, cwd, on) {
-  const r = await exec("gh", KINDS[kind].args, { cwd, on });
+async function gh(args, cwd, on) {
+  const r = await exec("gh", args, { cwd, on });
   if (r.code !== 0) throw new Error(friendlyError(r.stderr || r.stdout));
   return JSON.parse(r.stdout);
 }
 
+function listArgs(kind, filters) {
+  const search = [`sort:${filters.sort.id}`, filters.text].filter(Boolean).join(" ");
+  return [...KINDS[kind].args, "--search", search, ...[...filters.labels].flatMap((l) => ["--label", l])];
+}
+
 export default class GitHub extends View {
   init(_props, cx) {
-    this.tab = "prs"; this.items = { prs: [], issues: [] };
+    this.tab = "prs"; this.items = { prs: [], issues: [] }; this.repoLabels = []; this.generation = 0;
+    this.filters = { sort: SORTS[0], labels: new Set(), text: "" };
+    this.search = InputState.new({ placeholder: "Search, then Enter" });
+    this.search.on("submit", (_e, cx) => this.setText(this.search.value().trim(), cx));
+    this.search.on("change", (_e, cx) => { if (!this.search.value().trim() && this.filters.text) this.setText("", cx); });
     this.refresh(cx);
     cx.timer.every(REFRESH_MS, (cx) => this.refresh(cx));
     this.listenCommands(cx);
@@ -58,25 +73,70 @@ export default class GitHub extends View {
         const command = await nextCommand();
         if (command in KINDS) this.tab = command;
         if (command === "refresh") this.refresh(cx);
+        if (command === "sort") this.cycleSort(cx);
+        if (command === "labels") this.showLabels = !this.showLabels;
         cx.notify();
       }
     });
   }
 
   refresh(cx) {
-    if (this.loading) return;
     const { cwd, on } = location(), context = key();
-    if (context !== this.context) { this.context = context; this.items = { prs: [], issues: [] }; this.error = null; }
+    if (context !== this.context) this.resetFor(context, cwd, on, cx);
     if (!cwd) return;
+    const generation = ++this.generation, filters = this.filters;
     this.loading = true;
     cx.spawn(async (cx) => {
       try {
-        const [prs, issues] = await Promise.all([loadList("prs", cwd, on), loadList("issues", cwd, on)]);
-        if (key() === context) { this.items = { prs, issues }; this.error = null; }
-      } catch (e) { if (key() === context) this.error = String(e.message ?? e); }
-      finally { this.loading = false; cx.notify(); }
+        const [prs, issues] = await Promise.all(["prs", "issues"].map((kind) => gh(listArgs(kind, filters), cwd, on)));
+        if (generation === this.generation) { this.items = { prs, issues }; this.error = null; }
+      } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
+      finally { if (generation === this.generation) this.loading = false; cx.notify(); }
     });
     cx.notify();
+  }
+
+  // A new repo: its own labels, and filters on labels it may not have are dropped.
+  resetFor(context, cwd, on, cx) {
+    this.context = context; this.items = { prs: [], issues: [] }; this.error = null; this.repoLabels = [];
+    this.filters = { ...this.filters, labels: new Set() };
+    if (!cwd) return;
+    cx.spawn(async (cx) => {
+      try {
+        const labels = await gh(["label", "list", "--limit", "200", "--json", "name,color"], cwd, on);
+        if (key() === context) this.repoLabels = labels;
+      } catch { if (key() === context) this.repoLabels = []; }
+      cx.notify();
+    });
+  }
+
+  setFilters(change, cx) {
+    this.filters = { ...this.filters, ...change };
+    this.refresh(cx);
+  }
+
+  setText(text, cx) {
+    if (text !== this.filters.text) this.setFilters({ text }, cx);
+  }
+
+  cycleSort(cx) {
+    const next = SORTS[(SORTS.indexOf(this.filters.sort) + 1) % SORTS.length];
+    this.setFilters({ sort: next }, cx);
+  }
+
+  toggleLabel(name, cx) {
+    const labels = new Set(this.filters.labels);
+    if (labels.has(name)) labels.delete(name); else labels.add(name);
+    this.setFilters({ labels }, cx);
+  }
+
+  clearFilters(cx) {
+    this.search.set_value("");
+    this.setFilters({ sort: SORTS[0], labels: new Set(), text: "" }, cx);
+  }
+
+  hasFilters() {
+    return this.filters.sort !== SORTS[0] || this.filters.labels.size > 0 || Boolean(this.filters.text);
   }
 
   openUrl(url) {
@@ -90,6 +150,37 @@ export default class GitHub extends View {
       .on_click((_e, cx) => { this.tab = kind; cx.notify(); })
       .child(div().text_color(active ? t.foreground : t.muted).child(KINDS[kind].label))
       .child(div().text_size(10).text_color(t.dim).child(String(count)));
+  }
+
+  filterChip(id, label, active, onClick, t) {
+    return h_flex().id(id).h(24).px(8).gap(4).flex_none().items_center().rounded(6).cursor_pointer().text_size(11)
+      .bg(active ? t.selected : t.raised).text_color(active ? t.foreground : t.muted)
+      .hover((s) => s.bg(t.hover)).on_click((_e, cx) => onClick(cx)).child(label);
+  }
+
+  filterBar(t) {
+    const count = this.filters.labels.size;
+    return h_flex().h(38).flex_none().px(8).gap(6).items_center().border_b(1).border_color(t.border)
+      .child(this.filterChip("gh-sort", `${this.filters.sort.label} ↕`, this.filters.sort !== SORTS[0], (cx) => this.cycleSort(cx), t))
+      .child(this.filterChip("gh-labels", count ? `Labels · ${count}` : "Labels", count > 0 || this.showLabels,
+        (cx) => { this.showLabels = !this.showLabels; cx.notify(); }, t))
+      .child(div().flex_1().min_w(0).h(24).px(8).flex().items_center().rounded(6).border_1()
+        .border_color(this.filters.text ? t.accent : t.border).bg(t.background)
+        .child(Input.new(this.search).h_full().text_size(11).text_color(t.foreground)))
+      .when(this.hasFilters(), (e) => e.child(this.filterChip("gh-clear", "Clear", false, (cx) => this.clearFilters(cx), t)));
+  }
+
+  labelPicker(t) {
+    const picked = this.filters.labels;
+    return v_flex().id("gh-label-picker").flex_none().max_h(132).overflow_y_scrollbar().p(8).border_b(1).border_color(t.border)
+      .child(h_flex().flex_wrap().gap(5).children(this.repoLabels.map((l) => {
+        const on = picked.has(l.name);
+        return div().id(`gh-label-${l.name}`).px(6).h(20).flex().items_center().rounded(5).cursor_pointer().text_size(11)
+          .border_1().border_color(`#${l.color}${on ? "" : "88"}`).bg(on ? `#${l.color}44` : t.background)
+          .text_color(on ? t.foreground : t.muted).hover((s) => s.bg(`#${l.color}22`))
+          .on_click((_e, cx) => this.toggleLabel(l.name, cx)).child(l.name);
+      })))
+      .when(!this.repoLabels.length, (e) => e.child(div().text_size(11).text_color(t.dim).child("No labels in this repo")));
   }
 
   prMeta(pr, t) {
@@ -118,6 +209,7 @@ export default class GitHub extends View {
 
   row(item, t) {
     const meta = this.tab === "prs" ? this.prMeta(item, t) : this.issueMeta(item, t);
+    const date = item[this.filters.sort.date] ?? item.updatedAt;
     return v_flex().id(`gh-${this.tab}-${item.number}`).flex_none().px(10).py(7).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(t.hover)).on_click(() => this.openUrl(item.url))
       .child(h_flex().gap(8).items_center()
@@ -126,13 +218,14 @@ export default class GitHub extends View {
         .when(this.tab === "issues", (e) => e.child(this.agentButton(item, t))))
       .child(h_flex().gap(8).items_center()
         .child(div().flex_1().min_w(0).child(meta))
-        .child(div().flex_none().text_size(11).text_color(t.dim).child(`${item.author?.login ?? ""} · ${ago(item.updatedAt)}`)));
+        .child(div().flex_none().text_size(11).text_color(t.dim).child(`${item.author?.login ?? ""} · ${ago(date)}`)));
   }
 
   emptyText() {
     if (this.error) return this.error;
     if (this.loading) return "Loading…";
-    return this.tab === "prs" ? "No open pull requests" : "No open issues";
+    const what = this.tab === "prs" ? "pull requests" : "issues";
+    return this.hasFilters() ? `No open ${what} match these filters` : `No open ${what}`;
   }
 
   render(cx) {
@@ -143,6 +236,8 @@ export default class GitHub extends View {
         .child(this.tabButton("prs", t)).child(this.tabButton("issues", t)).child(div().flex_1())
         .child(div().id("gh-refresh").px(8).h(26).flex().items_center().rounded(7).cursor_pointer().text_size(11).text_color(t.muted)
           .hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.refresh(cx)).child(this.loading ? "…" : "Refresh")))
+      .child(this.filterBar(t))
+      .when(Boolean(this.showLabels), (e) => e.child(this.labelPicker(t)))
       .child(v_flex().id("github-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(2)
         .children(list.map((item) => this.row(item, t)))
         .when(!list.length, (e) => e.child(div().p(8).text_color(this.error ? t.ansi1 : t.dim).child(this.emptyText()))));
