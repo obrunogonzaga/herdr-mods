@@ -4,7 +4,7 @@ Mods for [Herdr](https://github.com/herdrdev/herdr-app), the desktop app for ter
 
 | Mod | What it does |
 | --- | --- |
-| [github-panel](github-panel/RECIPE.md) | Open PRs and issues of the space's repo, via `gh`. `cmd-shift-g` opens it. Start any installed agent on an issue, with model and reasoning, in a new worktree. |
+| [github-panel](github-panel/RECIPE.md) | Open PRs and issues of the space's repo, via `gh`. `cmd-shift-g` opens it. Start any installed agent on an issue, with model and reasoning, in a new worktree. A status-bar CI badge, with a notification when any space's checks finish. |
 
 | Popup (`cmd-shift-g`) | Side panel (cloned layout) |
 | --- | --- |
@@ -27,7 +27,7 @@ Mods are trusted code: these run `gh`, `git`, `open` and start agents. Read it b
 
 ## Development
 
-Edit here, then run `./sync.sh`. It copies every item's `mods/` and `layouts/` into `~/.config/herdr-app` (or `$HERDR_APP_HOME`) and runs `herdr-app check` on each mod. Herdr reloads on copy.
+Edit here, then run `./sync.sh`. Tests: `node --test`. It copies every item's `mods/` and `layouts/` into `~/.config/herdr-app` (or `$HERDR_APP_HOME`) and runs `herdr-app check` on each mod. Herdr reloads on copy.
 
 Herdr doesn't follow symlinks for live reload, so the repo is copied, not linked.
 

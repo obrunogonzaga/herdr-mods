@@ -5,7 +5,8 @@ between PRs and Issues; each row shows the number, the title, who opened it and 
 was last updated. PRs also show their review state and branch; issues show their labels. Click a
 row and it opens in your browser. Each issue has an `Agent` button: pick an installed agent, a model and a
 reasoning level, and it starts on the issue in a new worktree. It opens as a popup over the window (`cmd-shift-g`), and fits a
-side panel of a cloned layout just as well.
+side panel of a cloned layout just as well. The same mod also draws a CI badge for a status bar: the
+checks of the shown space's PR, and a notification when any space's checks finish.
 
 ![GitHub](preview.png)
 
@@ -31,7 +32,8 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
   - Line one: `#5610` at 11px in `accent`, an 8px gap, then the title in `foreground`,
     truncated to the width. Issues end it with an `Agent` button: 20px tall, 7px side padding,
     radius 6, 11px `muted`, a 1px `border`; `raised` and `foreground` under the pointer.
-  - Line two, 11px `dim`: on the left, for a PR, its review state then its branch, 8px apart
+  - Line two, 11px `dim`: on the left, for a PR, its CI (`✓` in `ansi2`, `✗` in `ansi1`, `●` in
+    `working`, nothing without checks), its review state, then its branch, 8px apart
     (`draft` in `dim`, `approved` in `ansi2`, `changes` in `ansi1`, otherwise `review` in
     `blocked`); for an issue, up to three labels, each a pill with 5px side padding, radius 4,
     a 1px border in the label's own GitHub color at 53% alpha and text in `muted`. On the
@@ -42,6 +44,12 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
   repo`, `Run gh auth login first` or gh's first error line in `ansi1` when it fails.
 
 As a popup it is 420×600 px, centered.
+
+**The CI badge** (`{ "mod": "github", "props": { "view": "ci" } }`, 28px tall): the `chrome`
+background with a 1px `border` on top, 14px side padding, 11.8px type, right-aligned. For the shown
+space's PR: `#5609  CI ✓ passed` in `ansi2`; `#5609  CI ✗ 2 failed` in `ansi1`; while running, the
+shipped `mods/workspace-chrome/spinner.svg` at 12px turning every 900 ms and `#5609  CI 6/10`
+(passed of total) in `working`; `CI · no checks` in `dim`. Empty when the branch has no PR.
 
 **The agent dialog** (480×620, `popover` background, 16px padding, sections 14px apart, each
 titled in 11px `dim`):
@@ -78,6 +86,15 @@ titled in 11px `dim`):
 - A click on a row runs `open <url>` on this computer, so the browser opens even for a space on
   a remote machine.
 - The tab choice is not saved.
+- The CI badge looks up every space, not only the shown one: one `gh pr view --json
+  number,title,url,statusCheckRollup` per distinct folder and machine (a space's first terminal's
+  live folder, else its folder), so agents' worktrees are covered. Every 30 s while any check runs,
+  else every 90 s. A failed check (any conclusion but success, neutral or skipped; a status that
+  isn't success or pending) wins over checks still running.
+- When checks it saw running finish, it notifies once: `CI failed · #12` (level error, the space
+  and up to three failed check names; clicking it runs `space.select` on that space) or `CI passed ·
+  #12` (success, 6 s). Nothing is notified for checks already done when it first looks.
+- A click on the badge opens the first failed check, else the PR's checks page.
 - `Agent` opens the dialog without opening the browser. In it, Enter in the branch field starts.
   Start makes a worktree at `~/.herdr/worktrees/<repo>/<branch, slashes as dashes>` on the space's
   machine (Herdr's own worktree path, so the spaces sidebar nests it and Herdr's worktree dialog
@@ -98,6 +115,10 @@ titled in 11px `dim`):
   `mod.open {name: "github"}` shows it as a popup and no layout docks it. `github.svg`: a 24×24
   pull-request glyph (two circles joined by a bent line), stroked `currentColor`, for a tab-bar
   button in a cloned layout.
+- `mods/github/main.js` picks the view from `props().view` (the first `init` argument doesn't carry
+  layout props): `panel.js` (the list, a plain class) or `ci.js` (the badge). Both import
+  `checks.js` (`summarizeChecks`, `finishedState`, `checksIcon`): a mod can't import another mod's
+  files, so one mod with two views shares them. The PR list adds `statusCheckRollup` to its fields.
 - `mods/issue-agent/main.js`: the dialog, a `View` opened with `openOverlay({ mod: "issue-agent",
   kind: "dialog", width: 480, height: 620, props: { issue: { number, title, labels }, cwd, on } })`.
   `mod.json`: `{ "place": "none" }`. Uses `knownAgents({ on })` (installed only), `exec` for git and
@@ -135,6 +156,12 @@ titled in 11px `dim`):
   repo's totals.
 - Results are dropped when the folder changes mid-load, so a slow `gh` never paints the wrong
   repo.
+- To show the badge, clone `main` and turn its `status` block into a row:
+  `{ "id": "status", "type": "row", "size": { "px": 28 }, "resizable": false, "children": [ { "id":
+  "status-main", "type": "block", "content": { "mod": "workspace-status" } }, { "id": "status-ci",
+  "type": "block", "size": { "px": 240 }, "content": { "mod": "github", "props": { "view": "ci" } } } ] }`.
+  Notifications only come while the badge is in the shown layout.
+- `gh pr view` per space each poll: many spaces mean many API calls.
 - To dock it as a side panel, clone `main` and `tabs`, add `{ "id": "github", "type": "block",
   "content": { "mod": "github" } }` to the `panel-body` stack and a third panel button beside
   Files and Changes. The shipped layout and tab bar are replaced on every start.
@@ -147,6 +174,8 @@ titled in 11px `dim`):
 - Clicking a row opens that PR or issue in the browser.
 - Switching to a space that isn't a repo shows `Not a git repository`.
 - `herdr-app do github.issues` with the panel shown switches it to the Issues tab.
+- In a space on a PR's branch, the badge shows that PR's number and its checks; PR rows show `✓`/`✗`/`●`.
+- `node --test` passes (`summarizeChecks` and `finishedState`).
 - `github.sort` once on a large repo shows its oldest open issues first, months old.
 - `github.labels` shows the repo's labels in their colors.
 - `herdr-app check mods/issue-agent` passes (it renders a placeholder without props).
