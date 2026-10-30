@@ -17,7 +17,17 @@ sync_item() {
   done
 }
 
+sync_personal_keys() {
+  local keys="$REPO_DIR/personal/keys.json" target="$APP_HOME/keys.json"
+  [ -f "$keys" ] || return 0
+  cmp -s "$keys" "$target" && return 0
+  [ -f "$target" ] && cp "$target" "$target.bak-$(date +%Y%m%d%H%M%S)"
+  cp "$keys" "$target"
+  echo "keys.json updated"
+}
+
 for item in "$REPO_DIR"/*/; do
   [ -d "$item/mods" ] || [ -d "$item/layouts" ] || continue
   sync_item "${item%/}"
 done
+sync_personal_keys
