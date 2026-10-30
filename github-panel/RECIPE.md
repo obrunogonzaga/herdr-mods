@@ -42,6 +42,7 @@ As a popup it is 420×600 px, centered.
 - A click on a row runs `open <url>` on this computer, so the browser opens even for a space on
   a remote machine.
 - The tab choice is not saved.
+- Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
 
 ## Built from
 
@@ -52,7 +53,7 @@ As a popup it is 420×600 px, centered.
   button in a cloned layout.
 - `keys.json`: `{ "global": { "cmd-shift-g": "mod.open:github" } }`.
 - `herdr` functions: `spaces`, `panes`, `focused` (to find the folder and machine), `exec`,
-  `theme`.
+  `theme`, `nextCommand` (a loop started in `init` that reads `prs`, `issues` and `refresh`).
 - Programs: `gh pr list --state open --limit 50 --json
   number,title,author,url,isDraft,updatedAt,reviewDecision,headRefName` and `gh issue list
   --state open --limit 50 --json number,title,author,url,labels,updatedAt`, run in the folder
@@ -79,3 +80,4 @@ As a popup it is 420×600 px, centered.
   counts in both tabs.
 - Clicking a row opens that PR or issue in the browser.
 - Switching to a space that isn't a repo shows `Not a git repository`.
+- `herdr-app do github.issues` with the panel shown switches it to the Issues tab.

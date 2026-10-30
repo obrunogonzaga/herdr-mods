@@ -1,6 +1,6 @@
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, panes, focused, exec, theme } from "herdr";
+import { spaces, panes, focused, exec, theme, nextCommand } from "herdr";
 
 const REFRESH_MS = 60000;
 const LIMIT = "50";
@@ -49,6 +49,18 @@ export default class GitHub extends View {
     this.tab = "prs"; this.items = { prs: [], issues: [] };
     this.refresh(cx);
     cx.timer.every(REFRESH_MS, (cx) => this.refresh(cx));
+    this.listenCommands(cx);
+  }
+
+  listenCommands(cx) {
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const command = await nextCommand();
+        if (command in KINDS) this.tab = command;
+        if (command === "refresh") this.refresh(cx);
+        cx.notify();
+      }
+    });
   }
 
   refresh(cx) {

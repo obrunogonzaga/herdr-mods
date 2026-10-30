@@ -6,7 +6,9 @@ Mods for [Herdr](https://github.com/herdrdev/herdr-app), the desktop app for ter
 | --- | --- |
 | [github-panel](github-panel/RECIPE.md) | Open PRs and issues of the space's repo, via `gh`. `cmd-shift-g` opens it. |
 
-![GitHub panel](github-panel/preview.png)
+| Popup (`cmd-shift-g`) | Side panel (cloned layout) |
+| --- | --- |
+| ![GitHub popup](github-panel/preview.png) | ![GitHub side panel](github-panel/panel.png) |
 
 ## Install
 
