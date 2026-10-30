@@ -18,6 +18,7 @@
     "cmd-p": "mod.open:picker",
     "cmd-shift-g": "mod.open:github",
     "cmd-shift-m": "mod.open:servers",
+    "cmd-shift-i": "mod.open:ideas",
     "cmd-shift-p": "app.palette",
     "cmd-,": "app.settings",
     "cmd-d": "pane.split:right",

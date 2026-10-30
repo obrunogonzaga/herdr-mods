@@ -154,6 +154,13 @@
                       "content": {
                         "mod": "servers"
                       }
+                    },
+                    {
+                      "id": "ideas",
+                      "type": "block",
+                      "content": {
+                        "mod": "ideas"
+                      }
                     }
                   ],
                   "active": "files"

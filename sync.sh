@@ -17,6 +17,12 @@ sync_item() {
   done
 }
 
+sync_personal_config() {
+  local config="$REPO_DIR/personal/ideas.json"
+  [ -f "$config" ] && cp "$config" "$APP_HOME/ideas.json"
+  return 0
+}
+
 sync_personal_keys() {
   local keys="$REPO_DIR/personal/keys.json" target="$APP_HOME/keys.json"
   [ -f "$keys" ] || return 0
@@ -31,3 +37,4 @@ for item in "$REPO_DIR"/*/; do
   sync_item "${item%/}"
 done
 sync_personal_keys
+sync_personal_config
