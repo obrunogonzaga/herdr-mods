@@ -147,6 +147,13 @@
                       "content": {
                         "mod": "github"
                       }
+                    },
+                    {
+                      "id": "servers",
+                      "type": "block",
+                      "content": {
+                        "mod": "servers"
+                      }
                     }
                   ],
                   "active": "files"
