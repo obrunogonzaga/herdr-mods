@@ -3,7 +3,8 @@
 The open pull requests and issues of the repo you are looking at, in one panel. Two tabs switch
 between PRs and Issues; each row shows the number, the title, who opened it and how long ago it
 was last updated. PRs also show their review state and branch; issues show their labels. Click a
-row and it opens in your browser. It opens as a popup over the window (`cmd-shift-g`), and fits a
+row and it opens in your browser. Each issue has an `Agent` button: pick an installed agent, a model and a
+reasoning level, and it starts on the issue in a new worktree. It opens as a popup over the window (`cmd-shift-g`), and fits a
 side panel of a cloned layout just as well.
 
 ![GitHub](preview.png)
@@ -20,7 +21,8 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
 - **The list**, scrolling, 6px padding, rows 2px apart. Each row is two lines on a radius 7
   card, 10px side and 7px vertical padding, 3px between lines, `hover` under the pointer:
   - Line one: `#5610` at 11px in `accent`, an 8px gap, then the title in `foreground`,
-    truncated to the width.
+    truncated to the width. Issues end it with an `Agent` button: 20px tall, 7px side padding,
+    radius 6, 11px `muted`, a 1px `border`; `raised` and `foreground` under the pointer.
   - Line two, 11px `dim`: on the left, for a PR, its review state then its branch, 8px apart
     (`draft` in `dim`, `approved` in `ansi2`, `changes` in `ansi1`, otherwise `review` in
     `blocked`); for an issue, up to three labels, each a pill with 5px side padding, radius 4,
@@ -32,6 +34,24 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
 
 As a popup it is 420×600 px, centered.
 
+**The agent dialog** (480×620, `popover` background, 16px padding, sections 14px apart, each
+titled in 11px `dim`):
+
+- `Start an agent on #12` at 14px semibold, the issue title under it in `dim`.
+- **Branch**: a 30px input, radius 8, prefilled `<type>/<number>-<first five title words>`; the type
+  comes from the labels (`bug` → `fix`, `documentation`/`docs` → `docs`, `refactor`, `chore`,
+  else `feat`).
+- **Agent**: a wrapping row of 26px chips, radius 7, one per installed agent with its icon at
+  14px; the chosen one `selected`/`foreground`, the others `raised`/`muted`.
+- **Model** (only for agents it knows): a filter input, then a 170px scrolling list. First row
+  `Agent's default`, which reads `Use "<typed text>"` when the filter matches no model; then each
+  model as `Label  ·  id`, up to 100. `Loading models…` while the CLI answers; its first error line
+  in `ansi1` when it fails.
+- **Reasoning**: chips of the levels the chosen model supports; `Agent's default` when none is
+  chosen, `This model has no reasoning levels` when it has none.
+- Footer: the error in 11px `ansi1` on the left, `Cancel` and a `Start agent` button in `solid`
+  (`Starting…` while it works).
+
 ## How it behaves
 
 - It doesn't show agent statuses: it lists GitHub items, not agents. Nothing animates.
@@ -42,6 +62,16 @@ As a popup it is 420×600 px, centered.
 - A click on a row runs `open <url>` on this computer, so the browser opens even for a space on
   a remote machine.
 - The tab choice is not saved.
+- `Agent` opens the dialog without opening the browser. In it, Enter in the branch field starts.
+  Start makes a worktree at `~/.herdr/worktrees/<repo>/<branch, slashes as dashes>` on the space's
+  machine (Herdr's own worktree path, so the spaces sidebar nests it and Herdr's worktree dialog
+  can remove it), branching from `origin/<default branch>` after a fetch, or from `HEAD` without a
+  remote; an existing branch is checked out instead. Then `space.new` opens it with a tab named
+  `#12`, `argv` the agent's command plus its model and reasoning flags, and `task` one line asking
+  it to read the issue with `gh`, follow AGENTS.md/CLAUDE.md, run lint, typecheck and tests, push
+  and open a PR with `Closes #12`, and not merge or deploy. The new space is shown.
+- The dialog remembers the last agent, model and reasoning (shared `issue-agent.last`) and caches
+  each machine's model lists for an hour (shared `issue-agent.models`).
 - Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
 
 ## Built from
@@ -51,6 +81,21 @@ As a popup it is 420×600 px, centered.
   `mod.open {name: "github"}` shows it as a popup and no layout docks it. `github.svg`: a 24×24
   pull-request glyph (two circles joined by a bent line), stroked `currentColor`, for a tab-bar
   button in a cloned layout.
+- `mods/issue-agent/main.js`: the dialog, a `View` opened with `openOverlay({ mod: "issue-agent",
+  kind: "dialog", width: 480, height: 620, props: { issue: { number, title, labels }, cwd, on } })`.
+  `mod.json`: `{ "place": "none" }`. Uses `knownAgents({ on })` (installed only), `exec` for git and
+  `gh repo view`, `home`, `shared`/`setShared`, `run("space.new", { folder, machine, tab, argv, task })`.
+- `mods/issue-agent/agents.js`: one adapter per CLI, matched by the agent's key or program:
+  | Agent | Models from | Flags |
+  | --- | --- | --- |
+  | Claude Code | `fable`, `opus`, `sonnet`, `haiku` | `--model`, `--effort` (low…max) |
+  | Codex | `codex debug models` (JSON; `visibility: "list"`, per-model reasoning levels and default) | `-m`, `-c model_reasoning_effort=` |
+  | OpenCode | `opencode models` (`provider/model` lines) | `--model` |
+  | Cursor | `cursor-agent --list-models` (`id - Label` lines) | `--model` |
+  | Pi | `pi --list-models` (table; thinking column `yes` gets off…max) | `--model`, `--thinking` |
+  | Gemini | none: type one | `--model` |
+  Other agents start with their own `run` and no model choice. A CLI that's a shell function is
+  retried through `"$SHELL" -ic`.
 - `keys.json`: `{ "global": { "cmd-shift-g": "mod.open:github" } }`.
 - `herdr` functions: `spaces`, `panes`, `focused` (to find the folder and machine), `exec`,
   `theme`, `nextCommand` (a loop started in `init` that reads `prs`, `issues` and `refresh`).
@@ -58,13 +103,17 @@ As a popup it is 420×600 px, centered.
   number,title,author,url,isDraft,updatedAt,reviewDecision,headRefName` and `gh issue list
   --state open --limit 50 --json number,title,author,url,labels,updatedAt`, run in the folder
   with `exec(..., { cwd, on })`; `open <url>` locally.
-- Reaches the network through `gh` and runs programs. Reads nothing outside its own folder.
+- Reaches the network through `gh` and `git fetch`, runs programs and starts agents with a task.
+  Writes worktrees under `~/.herdr/worktrees`. Reads nothing outside its own folder.
 
 ## Watch out
 
 - `gh` must be installed and logged in (`gh auth login`) on the machine the space lives on.
   For a remote space it runs there, not here.
 - `open` is macOS. On Linux the click does nothing; swap it for `xdg-open`.
+- `task` is typed into the agent as one line: a newline would send it early.
+- Agents run with whatever permissions their own config gives them; the task tells them to push
+  and open a PR.
 - Only the first 50 of each list show; the counts in the tabs are of what loaded, not the
   repo's totals.
 - Results are dropped when the folder changes mid-load, so a slow `gh` never paints the wrong
@@ -81,3 +130,7 @@ As a popup it is 420×600 px, centered.
 - Clicking a row opens that PR or issue in the browser.
 - Switching to a space that isn't a repo shows `Not a git repository`.
 - `herdr-app do github.issues` with the panel shown switches it to the Issues tab.
+- `herdr-app check mods/issue-agent` passes (it renders a placeholder without props).
+- `Agent` on an issue, Claude Code, `haiku`, `low`, Start: a new space opens on
+  `~/.herdr/worktrees/<repo>/feat-<n>-…`, Claude shows `Haiku … with low effort`, and the task is
+  its first message.

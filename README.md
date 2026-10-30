@@ -4,7 +4,7 @@ Mods for [Herdr](https://github.com/herdrdev/herdr-app), the desktop app for ter
 
 | Mod | What it does |
 | --- | --- |
-| [github-panel](github-panel/RECIPE.md) | Open PRs and issues of the space's repo, via `gh`. `cmd-shift-g` opens it. |
+| [github-panel](github-panel/RECIPE.md) | Open PRs and issues of the space's repo, via `gh`. `cmd-shift-g` opens it. Start any installed agent on an issue, with model and reasoning, in a new worktree. |
 
 | Popup (`cmd-shift-g`) | Side panel (cloned layout) |
 | --- | --- |
@@ -16,13 +16,14 @@ Ask your agent to add `github.com/obrunogonzaga/herdr-mods/github-panel`, or cop
 
 ```sh
 git clone https://github.com/obrunogonzaga/herdr-mods
-cp -R herdr-mods/github-panel/mods/github ~/.config/herdr-app/mods/
+cp -R herdr-mods/github-panel/mods/github herdr-mods/github-panel/mods/issue-agent ~/.config/herdr-app/mods/
 herdr-app check ~/.config/herdr-app/mods/github
+herdr-app check ~/.config/herdr-app/mods/issue-agent
 ```
 
 Then merge `github-panel/keys.json` into `~/.config/herdr-app/keys.json`.
 
-Mods are trusted code: this one runs `gh` and `open`. Read it before installing.
+Mods are trusted code: these run `gh`, `git`, `open` and start agents. Read it before installing.
 
 ## Development
 
