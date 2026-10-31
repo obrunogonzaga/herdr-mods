@@ -229,7 +229,11 @@ export class Panel {
   }
 
   render(cx) {
-    if (key() !== this.context) this.refresh(cx);
+    // A new repo reloads from a task: cx.notify() is refused during render.
+    if (key() !== this.context && !this.reloadQueued) {
+      this.reloadQueued = true;
+      cx.spawn(async (cx) => { this.reloadQueued = false; this.refresh(cx); });
+    }
     const t = theme(), list = this.items[this.tab];
     return v_flex().id("github").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(h_flex().h(42).flex_none().px(10).gap(4).items_center().border_b(1).border_color(t.border)
