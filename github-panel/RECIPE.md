@@ -4,7 +4,8 @@ The open pull requests and issues of the repo you are looking at, in one panel. 
 between PRs and Issues; each row shows the number, the title, who opened it and how long ago it
 was last updated. PRs also show their review state and branch; issues show their labels. Click a
 row and it opens in your browser. Each issue has an `Agent` button: pick an installed agent, a model and a
-reasoning level, and it starts on the issue in a new worktree. It opens as a popup over the window (`cmd-shift-g`), and fits a
+reasoning level, and it starts on the issue in a new worktree. Right-click an issue to start Claude Code or Codex
+at once, without the dialog. It opens as a popup over the window (`cmd-shift-g`), and fits a
 side panel of a cloned layout just as well. The same mod also draws a CI badge for a status bar: the
 checks of the shown space's PR, and a notification when any space's checks finish.
 
@@ -69,6 +70,11 @@ titled in 11px `dim`):
 - Footer: the error in 11px `ansi1` on the left, `Cancel` and a `Start agent` button in `solid`
   (`Starting…` while it works).
 
+**The quick menu** (right-click an issue; 260×112 popup at the pointer, `popover` background): the
+issue's `#12 title` in 11px `dim`, then two 28px rows, `Start Claude Code` and `Start Codex`, each
+with the agent's icon, `dim` when that agent isn't installed. While it starts the rows give way to
+`Starting <agent> on a new worktree…` in `muted`; an error shows in `ansi1`.
+
 ## How it behaves
 
 - It doesn't show agent statuses: it lists GitHub items, not agents. Nothing animates.
@@ -108,6 +114,10 @@ titled in 11px `dim`):
   and open a PR with `Closes #12`, and not merge or deploy. The new space is shown.
 - The dialog remembers the last agent, model and reasoning (shared `issue-agent.last`) and caches
   each machine's model lists for an hour (shared `issue-agent.models`).
+- Right-click on an issue opens the quick menu (`props.quick`). A pick starts exactly as the dialog's
+  Start does, with the branch name the dialog would suggest, and the model and reasoning last chosen
+  in the dialog when they were for the same agent, else the agent's defaults. It doesn't change
+  `issue-agent.last`. Left click still opens the issue in the browser.
 - Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads,
   `github.sort` cycles the sort, `github.labels` opens or closes the label picker. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
 
