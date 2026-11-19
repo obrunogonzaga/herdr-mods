@@ -44,7 +44,9 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
     right: `author · 2d` (`m`, `h` or `d` since it was opened, or since its last update when
     sorted by `Updated`).
 - **Milestone groups**, in place of the flat issue list while the sort chip says `Milestone`.
-  One 28px header per milestone that has a matching issue, radius 7, `hover` under the pointer:
+  One 28px header per milestone that has a matching issue, radius 7, a `selected` fill
+  so it stays apart from the issue rows, `hover` under the pointer, and 8px above it
+  after the first:
   `▾` or `▸` at 11px `muted`, the title at 12px semibold, and on the right `3 open · 5 closed ·
   due 6d` at 11px `dim` (`Nd overdue` when the due date has passed, `due today` on the day).
   The counts are the milestone's own open and closed numbers. A click collapses that section.

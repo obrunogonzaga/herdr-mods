@@ -305,26 +305,26 @@ export class Panel {
     return this.tab === "issues" && this.filters.sort.id === "milestone" && this.milestones.length > 0;
   }
 
-  sectionHeader(section, t) {
+  sectionHeader(section, t, first) {
     const collapsed = this.collapsed.has(section.key);
     const id = `gh-ms-${section.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
     return h_flex().id(id).h(28).px(8).gap(8).flex_none().items_center().rounded(7).cursor_pointer()
-      .hover((s) => s.bg(t.hover))
+      .mt(first ? 0 : 8).bg(t.selected).hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => { this.toggleSection(section.key); cx.notify(); })
       .child(div().flex_none().w(10).text_size(11).text_color(t.muted).child(collapsed ? "▸" : "▾"))
       .child(div().flex_1().min_w(0).truncate().text_size(12).font_semibold().child(section.title))
       .child(div().flex_none().text_size(11).text_color(t.dim).child(sectionMeta(section)));
   }
 
-  sectionNodes(section, t) {
-    const header = this.sectionHeader(section, t);
+  sectionNodes(section, t, first) {
+    const header = this.sectionHeader(section, t, first);
     if (this.collapsed.has(section.key)) return [header];
     return [header, ...section.issues.map((issue) => this.row(issue, t))];
   }
 
   listNodes(t) {
     if (!this.showsGroups()) return this.items[this.tab].map((item) => this.row(item, t));
-    return groupIssues(this.items.issues, this.milestones).flatMap((section) => this.sectionNodes(section, t));
+    return groupIssues(this.items.issues, this.milestones).flatMap((section, index) => this.sectionNodes(section, t, index === 0));
   }
 
   emptyText() {
