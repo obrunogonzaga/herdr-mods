@@ -15,6 +15,10 @@ sync_item() {
     [ -f "$layout" ] || continue
     cp "$layout" "$APP_HOME/layouts/"
   done
+  for theme in "$item"/themes/*.json; do
+    [ -f "$theme" ] || continue
+    cp "$theme" "$APP_HOME/themes/"
+  done
 }
 
 sync_personal_config() {

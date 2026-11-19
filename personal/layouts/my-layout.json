@@ -4,6 +4,13 @@
     "name": "main",
     "version": "0.1.8"
   },
+  "theme": {
+    "light": "aifbr-light",
+    "dark": "aifbr-dark"
+  },
+  "font": "IBM Plex Mono",
+  "font_weight": 500,
+  "ui_font": "IBM Plex Sans",
   "type": "row",
   "children": [
     {
@@ -14,10 +21,10 @@
           "id": "brand",
           "type": "block",
           "content": {
-            "mod": "workspace-chrome"
+            "mod": "aifbr-chrome"
           },
           "size": {
-            "px": 46
+            "px": 56
           },
           "window_drag": true
         },
