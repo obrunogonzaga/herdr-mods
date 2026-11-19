@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, finishedState } from "../github-panel/mods/github/checks.js";
+import { summarizeChecks, finishedState, checksSummaryText } from "../github-panel/mods/github/checks.js";
 
 const run = (status, conclusion, name = "x") => ({ __typename: "CheckRun", status, conclusion, name, detailsUrl: `u/${name}` });
 const ctx = (state, context = "s") => ({ __typename: "StatusContext", state, context, targetUrl: `t/${context}` });
@@ -8,6 +8,19 @@ const pr = (number, rollup) => ({ number, checks: summarizeChecks(rollup) });
 
 test("summarizeChecks_noChecks_returnsNone", () => {
   assert.equal(summarizeChecks([]).state, "none");
+  assert.deepEqual(summarizeChecks(null).checks, []);
+});
+
+test("summarizeChecks_listsEveryCheckInOrder", () => {
+  const summary = summarizeChecks([run("COMPLETED", "SUCCESS", "build"), run("COMPLETED", "FAILURE", "lint")]);
+  assert.deepEqual(summary.checks.map((check) => [check.name, check.state]), [["build", "pass"], ["lint", "fail"]]);
+});
+
+test("checksSummaryText_namesTheWinningState", () => {
+  assert.equal(checksSummaryText(summarizeChecks([])), "CI · no checks");
+  assert.equal(checksSummaryText(summarizeChecks([run("COMPLETED", "SUCCESS")])), "CI ✓ passed");
+  assert.equal(checksSummaryText(summarizeChecks([run("IN_PROGRESS", null), run("COMPLETED", "SUCCESS")])), "CI 1/2");
+  assert.equal(checksSummaryText(summarizeChecks([run("COMPLETED", "FAILURE", "lint")])), "CI ✗ 1 failed");
 });
 
 test("summarizeChecks_allSucceededOrSkipped_returnsPass", () => {
