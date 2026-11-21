@@ -1,5 +1,6 @@
 // Start an agent on a GitHub issue: props { issue: {number, title, labels}, cwd, on }.
 // Makes a worktree from the default branch and a space running the agent with the issue as its task.
+// props.quick: a right-click menu that starts Claude Code or Codex at once, without the dialog.
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
@@ -9,6 +10,7 @@ import { adapterFor } from "./agents.js";
 const LAST_CHOICE = "issue-agent.last";
 const MODEL_CACHE = "issue-agent.models";
 const CACHE_MS = 60 * 60 * 1000;
+const QUICK_AGENTS = [{ key: "claude", name: "Claude Code" }, { key: "codex", name: "Codex" }];
 const BRANCH_TYPES = { bug: "fix", documentation: "docs", docs: "docs", refactor: "refactor", chore: "chore" };
 
 const slug = (text) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
@@ -87,10 +89,12 @@ export default class IssueAgent extends View {
     cx.spawn(async (cx) => {
       try {
         this.agents = (await knownAgents({ on: props().on })).filter((a) => a.installed);
+        this.agentsLoaded = true;
+        if (props()?.quick) return;
         const last = shared(LAST_CHOICE) ?? {};
         this.pickAgent(this.agents.find((a) => a.key === last.agent) ?? this.agents[0], cx, last);
       } catch (e) { this.error = `Could not list agents: ${e}`; }
-      cx.notify();
+      finally { cx.notify(); }
     });
   }
 
@@ -127,20 +131,52 @@ export default class IssueAgent extends View {
 
   start(cx) {
     const branch = this.branchInput.value().trim();
-    if (this.busy || !this.agent || !branch || !this.issue.number) return;
-    const { cwd, on } = props(), agent = this.agent, model = this.chosenModelId(), effort = this.effort;
+    if (!this.agent || !branch) return;
+    this.launch(this.agent, this.chosenModelId(), this.effort, branch, true, cx);
+  }
+
+  // The right-click menu: start at once with the dialog's last model for this agent, else its default.
+  quickStart(key, cx) {
+    const agent = this.agents.find((a) => a.key === key || a.run?.[0]?.split("/").pop() === key);
+    if (!this.agentsLoaded) return;
+    if (!agent) { this.error = `${QUICK_AGENTS.find((q) => q.key === key)?.name ?? key} is not installed`; return cx.notify(); }
+    const last = shared(LAST_CHOICE) ?? {}, same = last.agent === agent.key;
+    this.quickName = agent.name;
+    this.launch(agent, same ? last.model : null, same ? last.effort : null, branchFor(this.issue), false, cx);
+  }
+
+  launch(agent, model, effort, branch, remember, cx) {
+    if (this.busy || !this.issue.number) return;
+    const { cwd, on } = props();
     const argv = [...agent.run, ...(adapterFor(agent)?.flags(model, effort) ?? [])];
     this.busy = true; this.error = null;
     cx.spawn(async (cx) => {
       try {
         const folder = await createWorktree(cwd, on, branch);
-        setShared(LAST_CHOICE, { agent: agent.key, model, effort });
+        if (remember) setShared(LAST_CHOICE, { agent: agent.key, model, effort });
         run("space.new", { folder, machine: on, tab: `#${this.issue.number}`, argv, task: taskFor(this.issue, branch) });
         closeOverlay(props().overlay);
       } catch (e) { this.error = String(e.message ?? e); }
       finally { this.busy = false; cx.notify(); }
     });
     cx.notify();
+  }
+
+  quickMenu(t) {
+    const item = (q) => {
+      const agent = this.agents.find((a) => a.key === q.key || a.run?.[0]?.split("/").pop() === q.key);
+      const icon = agent ? this.agentIcon(agent, t) : null;
+      return h_flex().id(`quick-${q.key}`).h(28).px(8).gap(8).items_center().rounded(6).cursor_pointer()
+        .text_color(agent ? t.foreground : t.dim).hover((s) => s.bg(t.hover))
+        .on_click((_e, cx) => this.quickStart(q.key, cx))
+        .when(Boolean(icon), (e) => e.child(icon)).child(`Start ${q.name}`);
+    };
+    const status = this.busy ? `Starting ${this.quickName} on a new worktree…`
+      : this.error ?? (this.agentsLoaded ? null : "Checking installed agents…");
+    return v_flex().id("issue-agent-quick").size_full().p(6).gap(2).bg(t.popover).text_color(t.foreground).text_size(12.5)
+      .child(div().px(8).py(2).text_size(11).text_color(t.dim).truncate().child(`#${this.issue.number} ${this.issue.title}`))
+      .when(!this.busy, (e) => e.children(QUICK_AGENTS.map(item)))
+      .when(Boolean(status), (e) => e.child(div().px(8).py(4).text_size(11).text_color(this.error ? t.ansi1 : t.muted).child(status)));
   }
 
   section(title, child, t) {
@@ -204,6 +240,7 @@ export default class IssueAgent extends View {
   }
 
   render(cx) {
+    if (props()?.quick) return this.quickMenu(theme());
     const t = theme(), hasModels = this.agent && adapterFor(this.agent);
     return v_flex().id("issue-agent").size_full().p(16).gap(14).bg(t.popover).text_color(t.foreground).text_size(12.5)
       .child(v_flex().gap(2)

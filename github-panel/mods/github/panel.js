@@ -262,6 +262,12 @@ export class Panel {
     openOverlay({ mod: "issue-agent", kind: "dialog", width: 480, height: 620, props: { issue, cwd, on } });
   }
 
+  // Right-click an issue: a menu that starts Claude Code or Codex on it without the dialog.
+  quickAgent(issue) {
+    const { cwd, on } = location();
+    openOverlay({ mod: "issue-agent", kind: "popup", at: "pointer", width: 260, height: 112, props: { issue, cwd, on, quick: true } });
+  }
+
   openDetail(item, cx) {
     const { cwd, on } = location();
     const detail = new Detail();
@@ -292,6 +298,7 @@ export class Panel {
         if (event.modifiers?.platform) { openUrl(item.url); return; }
         this.openDetail(item, cx);
       })
+      .when(this.tab === "issues", (e) => e.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.quickAgent(item); }))
       .child(h_flex().gap(8).items_center()
         .child(div().flex_none().text_size(11).text_color(t.accent).child(`#${item.number}`))
         .child(div().flex_1().min_w(0).truncate().child(item.title))
