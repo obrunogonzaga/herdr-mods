@@ -42,8 +42,10 @@ jobs:
       - name: Install Herdr
         run: |
           curl -fsSL -o "$RUNNER_TEMP/Herdr.dmg" https://releases.herdr.dev/app/Herdr.dmg
-          hdiutil attach -nobrowse -readonly "$RUNNER_TEMP/Herdr.dmg"
-          echo "HERDR_BIN=$RUNNER_TEMP/Herdr.app/Contents/MacOS/Herdr" >> "$GITHUB_ENV"
+          # Mount where the app's own path is known: the volume name is not.
+          mkdir -p "$RUNNER_TEMP/mount"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mount" "$RUNNER_TEMP/Herdr.dmg"
+          echo "HERDR_BIN=$RUNNER_TEMP/mount/Herdr.app/Contents/MacOS/Herdr" >> "$GITHUB_ENV"
       - name: Check every mod
         env:
           HERDR_APP_HOME: ${{ runner.temp }}/herdr-app-home
