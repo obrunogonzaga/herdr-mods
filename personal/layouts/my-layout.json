@@ -86,7 +86,7 @@
           "id": "tabs",
           "type": "block",
           "content": {
-            "mod": "my-tabs"
+            "mod": "aifbr-tabs"
           },
           "size": {
             "px": 42

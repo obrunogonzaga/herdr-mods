@@ -3,6 +3,7 @@ set -euo pipefail
 
 APP_HOME="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+MANIFEST="$APP_HOME/.herdr-mods-manifest"
 
 sync_item() {
   local item="$1"
@@ -19,6 +20,33 @@ sync_item() {
     [ -f "$theme" ] || continue
     cp "$theme" "$APP_HOME/themes/"
   done
+}
+
+# The repo's mods, by name: what sync puts in the app's mods/ folder.
+repo_mods() {
+  for item in "$REPO_DIR"/*/; do
+    [ -d "$item/mods" ] || continue
+    for mod in "$item"/mods/*/; do
+      [ -d "$mod" ] || continue
+      basename "$mod"
+    done
+  done
+}
+
+# A mod the repo renamed or dropped stays in the app's folder and breaks the
+# layout that names it. The manifest says what the last sync installed.
+remove_stale_mods() {
+  local current stale
+  current="$(repo_mods | sort -u)"
+  if [ -f "$MANIFEST" ]; then
+    while read -r stale; do
+      [ -n "$stale" ] || continue
+      echo "$current" | grep -qx "$stale" && continue
+      rm -rf "$APP_HOME/mods/$stale"
+      echo "removed stale mod: $stale"
+    done < "$MANIFEST"
+  fi
+  printf '%s\n' "$current" > "$MANIFEST"
 }
 
 sync_personal_config() {
@@ -66,6 +94,7 @@ for item in "$REPO_DIR"/*/; do
   [ -d "$item/mods" ] || [ -d "$item/layouts" ] || continue
   sync_item "${item%/}"
 done
+remove_stale_mods
 sync_personal_keys
 sync_personal_config
 sync_personal_settings
