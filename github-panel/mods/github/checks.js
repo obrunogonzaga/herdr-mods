@@ -12,14 +12,25 @@ function checkState(check) {
   return PASSED.has(check.conclusion) ? "pass" : "fail";
 }
 
-// { state: "fail" | "pending" | "pass" | "none", total, passed, pending, failed: [{ name, url }] }.
+// { state, total, passed, pending, failed, checks: [{ name, url, state }] }.
 // A failure wins over checks still running: it already needs you.
 export function summarizeChecks(rollup = []) {
-  const checks = rollup.map((c) => ({ name: c.name ?? c.context, url: c.detailsUrl ?? c.targetUrl, state: checkState(c) }));
-  const count = (state) => checks.filter((c) => c.state === state).length;
-  const failed = checks.filter((c) => c.state === "fail");
+  const checks = (rollup ?? []).map((check) => ({
+    name: check.name ?? check.context,
+    url: check.detailsUrl ?? check.targetUrl,
+    state: checkState(check),
+  }));
+  const count = (state) => checks.filter((check) => check.state === state).length;
+  const failed = checks.filter((check) => check.state === "fail");
   const state = !checks.length ? "none" : failed.length ? "fail" : count("pending") ? "pending" : "pass";
-  return { state, total: checks.length, passed: count("pass"), pending: count("pending"), failed };
+  return { state, total: checks.length, passed: count("pass"), pending: count("pending"), failed, checks };
+}
+
+export function checksSummaryText(summary) {
+  if (summary.state === "fail") return `CI ✗ ${summary.failed.length} failed`;
+  if (summary.state === "pending") return `CI ${summary.passed}/${summary.total}`;
+  if (summary.state === "pass") return "CI ✓ passed";
+  return "CI · no checks";
 }
 
 // "fail" or "pass" when a PR we saw running has finished; null otherwise (a new PR, still running,

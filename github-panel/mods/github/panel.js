@@ -1,14 +1,18 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { spaces, panes, focused, exec, theme, nextCommand, openOverlay } from "herdr";
+import { spaces, panes, focused, theme, nextCommand, openOverlay } from "herdr";
 import { summarizeChecks, checksIcon } from "./checks.js";
 import { openUrl } from "./open.js";
+import { gh } from "./gh.js";
+import { ago, reviewBadge } from "./format.js";
+import { groupIssues, issueArgs, sectionMeta } from "./milestones.js";
+import { Detail } from "./detail.js";
 
 const REFRESH_MS = 60000;
 const LIMIT = "50";
 const KINDS = {
   prs: { label: "PRs", args: ["pr", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,isDraft,createdAt,updatedAt,reviewDecision,headRefName,labels,statusCheckRollup"] },
-  issues: { label: "Issues", args: ["issue", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,labels,createdAt,updatedAt"] },
+  issues: { label: "Issues", args: ["issue", "list", "--state", "open", "--limit", LIMIT, "--json", "number,title,author,url,labels,createdAt,updatedAt,milestone"] },
 };
 // Sorted by GitHub's search, so "Oldest" reaches past the newest 50.
 const SORTS = [
@@ -16,6 +20,7 @@ const SORTS = [
   { id: "created-asc", label: "Oldest", date: "createdAt" },
   { id: "updated-desc", label: "Updated", date: "updatedAt" },
 ];
+const MILESTONE_SORT = { id: "milestone", label: "Milestone", date: "createdAt" };
 
 function location() {
   const space = spaces().find((s) => s.active), f = focused();
@@ -25,42 +30,51 @@ function location() {
 }
 const key = () => JSON.stringify(location());
 
-function ago(iso) {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${minutes}m`;
-  if (minutes < 1440) return `${Math.round(minutes / 60)}h`;
-  return `${Math.round(minutes / 1440)}d`;
-}
-
-function reviewBadge(pr, t) {
-  if (pr.isDraft) return { text: "draft", color: t.dim };
-  if (pr.reviewDecision === "APPROVED") return { text: "approved", color: t.ansi2 };
-  if (pr.reviewDecision === "CHANGES_REQUESTED") return { text: "changes", color: t.ansi1 };
-  return { text: "review", color: t.blocked };
-}
-
-function friendlyError(output) {
-  if (/not a git repository/i.test(output)) return "Not a git repository";
-  if (/no git remotes|none of the git remotes/i.test(output)) return "No GitHub remote in this repo";
-  if (/gh auth login|not logged/i.test(output)) return "Run gh auth login first";
-  return output.trim().split("\n")[0];
-}
-
-async function gh(args, cwd, on) {
-  const r = await exec("gh", args, { cwd, on });
-  if (r.code !== 0) throw new Error(friendlyError(r.stderr || r.stdout));
-  return JSON.parse(r.stdout);
-}
-
 function listArgs(kind, filters) {
-  const search = [`sort:${filters.sort.id}`, filters.text].filter(Boolean).join(" ");
+  const sort = filters.sort.id === "milestone" ? "created-desc" : filters.sort.id;
+  const search = [`sort:${sort}`, filters.text].filter(Boolean).join(" ");
   return [...KINDS[kind].args, "--search", search, ...[...filters.labels].flatMap((l) => ["--label", l])];
+}
+
+async function catalog(cwd, on) {
+  const repo = await gh(["repo", "view", "--json", "nameWithOwner"], cwd, on);
+  const name = repo?.nameWithOwner ?? "";
+  if (!/^[^/\s]+\/[^/\s]+$/.test(name)) return [];
+  const list = await gh(["api", "--paginate", `repos/${name}/milestones?state=open&per_page=100`], cwd, on);
+  return Array.isArray(list) ? list : [];
+}
+
+function stamp(issue, milestone) {
+  if (issue.milestone?.title) return issue;
+  return { ...issue, milestone: { title: milestone.title, number: milestone.number } };
+}
+
+async function milestoneIssues(filters, cwd, on) {
+  const milestones = await catalog(cwd, on);
+  const open = milestones.filter((m) => (m.open_issues ?? 0) > 0);
+  const loaded = await Promise.all([
+    gh(issueArgs(filters, { noMilestone: true }), cwd, on),
+    ...open.map((m) => gh(issueArgs(filters, { milestone: m.title }), cwd, on)),
+  ]);
+  const [none, ...buckets] = loaded;
+  const tagged = buckets.flatMap((issues, index) => issues.map((issue) => stamp(issue, open[index])));
+  return { items: [...tagged, ...none], milestones };
+}
+
+async function loadLists(filters, cwd, on) {
+  const prsPromise = gh(listArgs("prs", filters), cwd, on);
+  const issuesPromise = filters.sort.id === "milestone"
+    ? milestoneIssues(filters, cwd, on)
+    : gh(listArgs("issues", filters), cwd, on).then((items) => ({ items, milestones: null }));
+  const [prs, issues] = await Promise.all([prsPromise, issuesPromise]);
+  return { prs, issues: issues.items, milestones: issues.milestones };
 }
 
 // The PRs and issues panel (also the cmd-shift-g popup).
 export class Panel {
   init(_props, cx) {
-    this.tab = "prs"; this.items = { prs: [], issues: [] }; this.repoLabels = []; this.generation = 0;
+    this.tab = "prs"; this.items = { prs: [], issues: [] }; this.repoLabels = []; this.milestones = []; this.generation = 0; this.detailView = null;
+    this.collapsed = new Set(["no-milestone"]);
     this.filters = { sort: SORTS[0], labels: new Set(), text: "" };
     this.search = InputState.new({ placeholder: "Search, then Enter" });
     this.search.on("submit", (_e, cx) => this.setText(this.search.value().trim(), cx));
@@ -74,7 +88,7 @@ export class Panel {
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command in KINDS) this.tab = command;
+        if (command in KINDS) { this.tab = command; this.detailView = null; }
         if (command === "refresh") this.refresh(cx);
         if (command === "sort") this.cycleSort(cx);
         if (command === "labels") this.showLabels = !this.showLabels;
@@ -86,13 +100,18 @@ export class Panel {
   refresh(cx) {
     const { cwd, on } = location(), context = key();
     if (context !== this.context) this.resetFor(context, cwd, on, cx);
+    if (this.detailView && context === this.context) this.detailView.load(cx);
     if (!cwd) return;
     const generation = ++this.generation, filters = this.filters;
     this.loading = true;
     cx.spawn(async (cx) => {
       try {
-        const [prs, issues] = await Promise.all(["prs", "issues"].map((kind) => gh(listArgs(kind, filters), cwd, on)));
-        if (generation === this.generation) { this.items = { prs, issues }; this.error = null; }
+        const loaded = await loadLists(filters, cwd, on);
+        if (generation === this.generation) {
+          this.items = { prs: loaded.prs, issues: loaded.issues };
+          if (loaded.milestones) this.milestones = loaded.milestones;
+          this.error = null;
+        }
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) this.loading = false; cx.notify(); }
     });
@@ -101,9 +120,15 @@ export class Panel {
 
   // A new repo: its own labels, and filters on labels it may not have are dropped.
   resetFor(context, cwd, on, cx) {
-    this.context = context; this.items = { prs: [], issues: [] }; this.error = null; this.repoLabels = [];
+    this.context = context; this.items = { prs: [], issues: [] }; this.error = null; this.repoLabels = []; this.milestones = []; this.detailView = null;
+    this.collapsed = new Set(["no-milestone"]);
     this.filters = { ...this.filters, labels: new Set() };
     if (!cwd) return;
+    this.loadLabels(context, cwd, on, cx);
+    if (this.filters.sort.id !== "milestone") this.loadCatalog(context, cwd, on, cx);
+  }
+
+  loadLabels(context, cwd, on, cx) {
     cx.spawn(async (cx) => {
       try {
         const labels = await gh(["label", "list", "--limit", "200", "--json", "name,color"], cwd, on);
@@ -113,8 +138,21 @@ export class Panel {
     });
   }
 
+  loadCatalog(context, cwd, on, cx) {
+    cx.spawn(async (cx) => {
+      try {
+        const milestones = await catalog(cwd, on);
+        if (key() === context) this.milestones = milestones;
+      } catch { if (key() === context) this.milestones = []; }
+      cx.notify();
+    });
+  }
+
   setFilters(change, cx) {
-    this.filters = { ...this.filters, ...change };
+    const next = { ...this.filters, ...change };
+    const entering = next.sort.id === "milestone" && this.filters.sort.id !== "milestone";
+    this.filters = next;
+    if (entering) this.items = { ...this.items, issues: [] };
     this.refresh(cx);
   }
 
@@ -122,9 +160,21 @@ export class Panel {
     if (text !== this.filters.text) this.setFilters({ text }, cx);
   }
 
+  availableSorts() {
+    if (this.tab === "issues" && this.milestones.length) return [...SORTS, MILESTONE_SORT];
+    return SORTS;
+  }
+
   cycleSort(cx) {
-    const next = SORTS[(SORTS.indexOf(this.filters.sort) + 1) % SORTS.length];
+    const sorts = this.availableSorts();
+    const index = sorts.findIndex((sort) => sort.id === this.filters.sort.id);
+    const next = index === -1 ? sorts[0] : sorts[(index + 1) % sorts.length];
     this.setFilters({ sort: next }, cx);
+  }
+
+  toggleSection(key) {
+    if (this.collapsed.has(key)) this.collapsed.delete(key);
+    else this.collapsed.add(key);
   }
 
   toggleLabel(name, cx) {
@@ -190,9 +240,21 @@ export class Panel {
       .child(div().min_w(0).truncate().child(pr.headRefName));
   }
 
+  planName(issue) {
+    if (this.filters.sort.id === "milestone") return "";
+    return issue.milestone?.title ?? "";
+  }
+
+  labelPill(label, t) {
+    return div().flex_none().px(5).rounded(4).border_1().border_color(`#${label.color}88`).text_color(t.muted).child(label.name);
+  }
+
   issueMeta(issue, t) {
+    const labels = (issue.labels ?? []).filter((label) => !this.filters.labels.has(label.name));
+    const plan = this.planName(issue);
     return h_flex().gap(6).text_size(11).text_color(t.dim).min_w(0).overflow_hidden()
-      .children(issue.labels.slice(0, 3).map((l) => div().px(5).rounded(4).border_1().border_color(`#${l.color}88`).text_color(t.muted).child(l.name)));
+      .when(Boolean(plan), (row) => row.child(div().min_w(0).truncate().text_color(t.muted).child(plan)))
+      .children(labels.slice(0, plan ? 2 : 3).map((label) => this.labelPill(label, t)));
   }
 
   startAgent(issue) {
@@ -206,6 +268,21 @@ export class Panel {
     openOverlay({ mod: "issue-agent", kind: "popup", width: 260, height: 112, props: { issue, cwd, on, quick: true } });
   }
 
+  openDetail(item, cx) {
+    const { cwd, on } = location();
+    const detail = new Detail();
+    detail.init({
+      kind: this.tab,
+      number: item.number,
+      cwd,
+      on,
+      onBack: () => { this.detailView = null; },
+      onAgent: (issue) => this.startAgent(issue),
+    }, cx);
+    this.detailView = detail;
+    cx.notify();
+  }
+
   agentButton(issue, t) {
     return div().id(`gh-agent-${issue.number}`).flex_none().px(7).h(20).flex().items_center().rounded(6)
       .text_size(11).text_color(t.muted).border_1().border_color(t.border).hover((s) => s.bg(t.raised).text_color(t.foreground))
@@ -217,7 +294,10 @@ export class Panel {
     const meta = this.tab === "prs" ? this.prMeta(item, t) : this.issueMeta(item, t);
     const date = item[this.filters.sort.date] ?? item.updatedAt;
     return v_flex().id(`gh-${this.tab}-${item.number}`).flex_none().px(10).py(7).gap(3).rounded(7).cursor_pointer()
-      .hover((s) => s.bg(t.hover)).on_click(() => openUrl(item.url))
+      .hover((s) => s.bg(t.hover)).on_click((event, cx) => {
+        if (event.modifiers?.platform) { openUrl(item.url); return; }
+        this.openDetail(item, cx);
+      })
       .when(this.tab === "issues", (e) => e.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.quickAgent(item); }))
       .child(h_flex().gap(8).items_center()
         .child(div().flex_none().text_size(11).text_color(t.accent).child(`#${item.number}`))
@@ -228,6 +308,32 @@ export class Panel {
         .child(div().flex_none().text_size(11).text_color(t.dim).child(`${item.author?.login ?? ""} · ${ago(date)}`)));
   }
 
+  showsGroups() {
+    return this.tab === "issues" && this.filters.sort.id === "milestone" && this.milestones.length > 0;
+  }
+
+  sectionHeader(section, t, first) {
+    const collapsed = this.collapsed.has(section.key);
+    const id = `gh-ms-${section.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    return h_flex().id(id).h(28).px(8).gap(8).flex_none().items_center().rounded(7).cursor_pointer()
+      .mt(first ? 0 : 8).bg(t.selected).hover((s) => s.bg(t.hover))
+      .on_click((_e, cx) => { this.toggleSection(section.key); cx.notify(); })
+      .child(div().flex_none().w(10).text_size(11).text_color(t.muted).child(collapsed ? "▸" : "▾"))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).font_semibold().child(section.title))
+      .child(div().flex_none().text_size(11).text_color(t.dim).child(sectionMeta(section)));
+  }
+
+  sectionNodes(section, t, first) {
+    const header = this.sectionHeader(section, t, first);
+    if (this.collapsed.has(section.key)) return [header];
+    return [header, ...section.issues.map((issue) => this.row(issue, t))];
+  }
+
+  listNodes(t) {
+    if (!this.showsGroups()) return this.items[this.tab].map((item) => this.row(item, t));
+    return groupIssues(this.items.issues, this.milestones).flatMap((section, index) => this.sectionNodes(section, t, index === 0));
+  }
+
   emptyText() {
     if (this.error) return this.error;
     if (this.loading) return "Loading…";
@@ -235,10 +341,16 @@ export class Panel {
     return this.hasFilters() ? `No open ${what} match these filters` : `No open ${what}`;
   }
 
+  frame(t) {
+    return v_flex().id("github").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13);
+  }
+
   render(cx) {
     if (key() !== this.context) this.refresh(cx);
     const t = theme(), list = this.items[this.tab];
-    return v_flex().id("github").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
+    const root = this.frame(t);
+    if (this.detailView) return root.child(this.detailView.render());
+    return root
       .child(h_flex().h(42).flex_none().px(10).gap(4).items_center().border_b(1).border_color(t.border)
         .child(this.tabButton("prs", t)).child(this.tabButton("issues", t)).child(div().flex_1())
         .child(div().id("gh-refresh").px(8).h(26).flex().items_center().rounded(7).cursor_pointer().text_size(11).text_color(t.muted)
@@ -246,7 +358,7 @@ export class Panel {
       .child(this.filterBar(t))
       .when(Boolean(this.showLabels), (e) => e.child(this.labelPicker(t)))
       .child(v_flex().id("github-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(2)
-        .children(list.map((item) => this.row(item, t)))
+        .children(this.listNodes(t))
         .when(!list.length, (e) => e.child(div().p(8).text_color(this.error ? t.ansi1 : t.dim).child(this.emptyText()))));
   }
 }

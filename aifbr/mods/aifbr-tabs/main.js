@@ -11,6 +11,14 @@ function find(node, id) {
   return null;
 }
 
+const PANEL_DEFS = [
+  { id: "files", label: "Files", icon: "mods/files/file.svg" },
+  { id: "changes", label: "Changes", icon: "mods/changes/changes.svg" },
+  { id: "github", label: "GitHub", icon: "mods/aifbr-tabs/github.svg" },
+  { id: "servers", label: "Servers", icon: "mods/workspace-chrome/server.svg" },
+  { id: "ideas", label: "Ideas", icon: "mods/aifbr-tabs/lightbulb.svg" },
+];
+
 export default class Tabs extends View {
   init() {
     this.pressed = null;
@@ -77,7 +85,12 @@ export default class Tabs extends View {
       ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
-    const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), "github", "servers", "ideas"];
+    // Show a button for each panel present in the layout's stack so optional
+    // panels (github, servers, ideas) appear as soon as the layout includes them.
+    const stackIds = new Set((body?.children ?? []).map(c => c.id));
+    const shippedAllowed = new Set(shared("workspace.panels") ?? ["files", "changes"]);
+    const buttons = PANEL_DEFS.filter(d => stackIds.has(d.id) && (d.id !== "files" && d.id !== "changes" ? true : shippedAllowed.has(d.id)));
+    const enabled = buttons.map(d => d.id);
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {
       const on = panel && !panel.hidden && body?.active === id;
@@ -94,11 +107,7 @@ export default class Tabs extends View {
       .on_scroll_wheel(e => { if (Math.abs(e.delta.y) >= 1) run(e.delta.y > 0 ? "tab.prev" : "tab.next"); })
       .child(h_flex().id("tab-scroll").flex_1().min_w(0).h_full().items_center().gap(3).overflow_x_scrollbar().children(shown.map(item)))
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
-      .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
-      .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
-      .child(panelButton("github", "GitHub", "mods/github/github.svg"))
-      .child(panelButton("servers", "Servers", "mods/workspace-chrome/server.svg"))
-      .child(panelButton("ideas", "Ideas", "mods/ideas/lightbulb.svg"))
+      .children(buttons.map(d => panelButton(d.id, d.label, d.icon)))
       .when(window()?.buttons, el => el.child(button("minimize", "−", () => run("window.minimize")))
         .child(button("maximize", "□", () => run("window.maximize")))
         .child(button("close-window", svg("mods/pane/close.svg").size(13), () => run("window.close"))));

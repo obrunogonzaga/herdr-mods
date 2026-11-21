@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tests
+        run: node --test
+      - name: JSON
+        run: node scripts/check-json.mjs .
+
+  mods:
+    name: mods
+    # The desktop app is macOS-only, and `herdr-app check` loads a mod for real:
+    # it renders the mod once and reports what broke.
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Herdr
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/Herdr.dmg" https://releases.herdr.dev/app/Herdr.dmg
+          # Mount where the app's own path is known: the volume name is not.
+          mkdir -p "$RUNNER_TEMP/mount"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mount" "$RUNNER_TEMP/Herdr.dmg"
+          echo "HERDR_BIN=$RUNNER_TEMP/mount/Herdr.app/Contents/MacOS/Herdr" >> "$GITHUB_ENV"
+      - name: Check every mod
+        env:
+          HERDR_APP_HOME: ${{ runner.temp }}/herdr-app-home
+        run: |
+          mkdir -p "$HERDR_APP_HOME"
+          status=0
+          for mod in */mods/*/; do
+            [ -d "$mod" ] || continue
+            echo "--- $mod"
+            "$HERDR_BIN" check "$mod" || status=1
+          done
+          exit $status

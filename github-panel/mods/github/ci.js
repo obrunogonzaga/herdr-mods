@@ -1,7 +1,7 @@
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, panes, exec, theme, notify } from "herdr";
-import { summarizeChecks, finishedState } from "./checks.js";
+import { summarizeChecks, finishedState, checksSummaryText } from "./checks.js";
 import { safeUrl } from "./urls.js";
 import { openUrl } from "./open.js";
 
@@ -70,11 +70,12 @@ export class CiBadge {
   }
 
   badge(pr, t) {
-    const { state, failed, passed, total } = pr.checks;
-    if (state === "fail") return { color: t.ansi1, text: `CI ✗ ${failed.length} failed`, url: safeUrl(failed[0].url) ?? `${pr.url}/checks` };
-    if (state === "pending") return { color: t.working, text: `CI ${passed}/${total}`, url: `${pr.url}/checks`, spin: true };
-    if (state === "pass") return { color: t.ansi2, text: "CI ✓ passed", url: `${pr.url}/checks` };
-    return { color: t.dim, text: "CI · no checks", url: pr.url };
+    const { state, failed } = pr.checks;
+    const text = checksSummaryText(pr.checks);
+    if (state === "fail") return { color: t.ansi1, text, url: safeUrl(failed[0].url) ?? `${pr.url}/checks` };
+    if (state === "pending") return { color: t.working, text, url: `${pr.url}/checks`, spin: true };
+    if (state === "pass") return { color: t.ansi2, text, url: `${pr.url}/checks` };
+    return { color: t.dim, text, url: pr.url };
   }
 
   render(cx) {
