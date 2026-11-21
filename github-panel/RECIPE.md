@@ -3,8 +3,10 @@
 The open pull requests and issues of the repo you are looking at, in one panel. Two tabs switch
 between PRs and Issues; each row shows the number, the title, who opened it and how long ago it
 was last updated. PRs also show their review state and branch; issues show their labels. Click a
-row and it opens in your browser. Each issue has an `Agent` button: pick an installed agent, a model and a
-reasoning level, and it starts on the issue in a new worktree. It opens as a popup over the window (`cmd-shift-g`), and fits a
+row and the panel shows that PR or issue: its description, status and, for a PR, each check. A
+`GitHub` button, or a command-click on the row, still opens it in the browser. Each issue has an `Agent` button: pick an installed agent, a model and a
+reasoning level, and it starts on the issue in a new worktree. Right-click an issue to start Claude Code or Codex
+at once, without the dialog. It opens as a popup over the window (`cmd-shift-g`), and fits a
 side panel of a cloned layout just as well. The same mod also draws a CI badge for a status bar: the
 checks of the shown space's PR, and a notification when any space's checks finish.
 
@@ -20,7 +22,8 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
   `muted`. Both get `hover` under the pointer. On the right a `Refresh` button, 11px `muted`,
   26px tall, radius 7; while a load runs it reads `…`.
 - **Filter bar**, 38px tall, 8px side padding, 6px gaps, a 1px `border` line under it. A sort chip
-  (`Newest ↕`, `Oldest ↕`, `Updated ↕`), a `Labels` chip (`Labels · 2` with two picked), a search
+  (`Newest ↕`, `Oldest ↕`, `Updated ↕`, and `Milestone ↕` once the repo has an open
+  milestone), a `Labels` chip (`Labels · 2` with two picked), a search
   field filling the rest (24px, radius 6, placeholder `Search, then Enter`, its border `accent`
   while a search applies) and, when anything differs from the default, `Clear`. Chips are 24px,
   8px side padding, radius 6, 11px; active ones `selected`/`foreground`, others `raised`/`muted`.
@@ -36,12 +39,45 @@ One column on the `background` color, radius 10, a 1px `border`, base type 13px.
     `working`, nothing without checks), its review state, then its branch, 8px apart
     (`draft` in `dim`, `approved` in `ansi2`, `changes` in `ansi1`, otherwise `review` in
     `blocked`); for an issue, up to three labels, each a pill with 5px side padding, radius 4,
-    a 1px border in the label's own GitHub color at 53% alpha and text in `muted`. On the
+    a 1px border in the label's own GitHub color at 53% alpha and text in `muted`. A label
+    already picked in the filter is left off this line. On a flat issue list, the milestone
+    title comes first, in `muted`, and then at most two labels. On the
     right: `author · 2d` (`m`, `h` or `d` since it was opened, or since its last update when
     sorted by `Updated`).
+- **Milestone groups**, in place of the flat issue list while the sort chip says `Milestone`.
+  One 28px header per milestone that has a matching issue, radius 7, a `selected` fill
+  so it stays apart from the issue rows, `hover` under the pointer, and 8px above it
+  after the first:
+  `▾` or `▸` at 11px `muted`, the title at 12px semibold, and on the right `3 open · 5 closed ·
+  due 6d` at 11px `dim` (`Nd overdue` when the due date has passed, `due today` on the day).
+  The counts are the milestone's own open and closed numbers. A click collapses that section.
+  Milestones with a due date come first, soonest first; the rest follow by title. `No milestone`
+  is last, starts collapsed, and its meta is only `N open`. Issues inside a section stay in
+  newest-created order. The milestone name is not repeated on those rows.
 - In place of the list, at 8px padding: `Loading…` before the first load; `No open pull
   requests` or `No open issues` when empty; `Not a git repository`, `No GitHub remote in this
   repo`, `Run gh auth login first` or gh's first error line in `ansi1` when it fails.
+
+**The detail** replaces the tabs, filters and list in the same frame:
+
+- **Toolbar**, 42px, 10px side padding, a 1px `border` under it. `Back`, `GitHub` and `Refresh`
+  are 26px chips, 8px side padding, radius 7, 11px `muted`, `hover` under the pointer. `Refresh`
+  reads `…` while a load runs. Between `Back` and the buttons, `#5610` at 11px `dim`, truncated.
+  An issue also has the list's `Agent` button. `GitHub` appears once the item has loaded.
+- **Summary**, 10px side padding, 8px vertical, 6px between lines, a 1px `border` under it. The
+  title at 14px semibold, wrapping. Then `author · opened 2d · updated 5h` at 11px `dim`, plus
+  `closed` when it is no longer open. A PR then shows its review state, `branch → base` (truncated),
+  `+N` in `ansi2`, `-N` in `ansi1`, `N files`, and a merge word when it is not the same word as the
+  review state: `clean` in `ansi2`; `dirty`, `blocked` and `unstable` in `ansi1`; `behind` in
+  `blocked`; `draft`, `hooks` and `unknown` in `dim`. Then the CI line, the same words as the
+  badge, and each check on a 22px row: `✓`, `✗` or `●` and its name. That list scrolls after
+  132px. A check whose details URL is https opens it. An issue shows every label, as on the list,
+  and `assignees ada, grace` at 11px `dim`. An issue with a milestone shows its title there
+  too, at 11px `dim`, above the labels.
+- **Description**, filling the rest, scrolling, 10px side padding. The body as markdown.
+  `No description` in `dim` when the body is empty. A link in the body opens only when it is https.
+- Before the first payload, `Loading…` in `dim`. When that load fails, gh's first error line in
+  `ansi1`. A later refresh that fails keeps the payload and shows the error under the summary.
 
 As a popup it is 420×600 px, centered.
 
@@ -69,22 +105,40 @@ titled in 11px `dim`):
 - Footer: the error in 11px `ansi1` on the left, `Cancel` and a `Start agent` button in `solid`
   (`Starting…` while it works).
 
+**The quick menu** (right-click an issue; 260×112 popup at the pointer, `popover` background): the
+issue's `#12 title` in 11px `dim`, then two 28px rows, `Start Claude Code` and `Start Codex`, each
+with the agent's icon, `dim` when that agent isn't installed. While it starts the rows give way to
+`Starting <agent> on a new worktree…` in `muted`; an error shows in `ansi1`.
+
 ## How it behaves
 
 - It doesn't show agent statuses: it lists GitHub items, not agents. Nothing animates.
 - The repo is the focused pane's folder (else the focused terminal's, else the shown space's
   folder), on that space's machine. Switching space or focus re-renders and reloads at once.
 - PRs and issues load together, up to 50 of each, open only. The list reloads every 60 s and
-  on `Refresh`.
+  on `Refresh`. `Milestone` is the exception: each open milestone is loaded on its own, up to 100
+  issues, plus the issues with no milestone, so one newest-50 cut cannot split a plan.
 - Sorting and filtering happen on GitHub, not on the loaded rows, so `Oldest` reaches issues past
   the newest 50: `--search "sort:<created-desc|created-asc|updated-desc> <text>"` plus one `--label`
-  per picked label (an item must have all of them). The sort chip cycles; a label click toggles it;
+  per picked label (an item must have all of them). The sort chip cycles `Newest`, `Oldest`,
+  `Updated`, then `Milestone` when the repo has an open milestone. On the PRs tab the cycle stays
+  the first three, and a `Milestone` choice still lists PRs as newest. A label click toggles it;
   Enter in the field applies the text and emptying it clears it; `Clear` resets all three. Each
-  change reloads at once; an older load that finishes late is dropped.
+  change reloads at once; an older load that finishes late is dropped. `Milestone` asks
+  `gh api repos/<owner>/<repo>/milestones` for the open plans, then one `gh issue list` per plan
+  (`--milestone`) and one with `no:milestone` in the search. Inside a plan the order is newest
+  created. A milestone with no issue matching the filters is left out. Switching repo collapses
+  `No milestone` again and expands the rest.
 - Filters apply to both tabs and last while the panel is open. Switching to another repo drops the
   label picks and loads that repo's labels (`gh label list --limit 200`).
-- A click on a row runs `open <url>` on this computer, so the browser opens even for a space on
-  a remote machine.
+- A click on a row opens its detail in the panel. Command-click runs `open <url>` on this computer,
+  so the browser opens even for a space on a remote machine. `GitHub` on the detail does the same,
+  and so does a check whose details URL is https. `Back` returns to the list with the same tab and
+  filters. Switching to another repo, or `github.prs` / `github.issues`, closes the detail.
+- The detail loads with `gh pr view` or `gh issue view` for that number, in the folder it was
+  opened from. The panel's 60 s reload and `Refresh` on the detail load it again without clearing
+  it. An older load that finishes late is dropped. A link in the description goes through `safeUrl`
+  before `open`.
 - The tab choice is not saved.
 - The CI badge looks up every space, not only the shown one: one `gh pr view --json
   number,title,url,statusCheckRollup` per distinct folder and machine (a space's first terminal's
@@ -108,6 +162,10 @@ titled in 11px `dim`):
   and open a PR with `Closes #12`, and not merge or deploy. The new space is shown.
 - The dialog remembers the last agent, model and reasoning (shared `issue-agent.last`) and caches
   each machine's model lists for an hour (shared `issue-agent.models`).
+- Right-click on an issue opens the quick menu (`props.quick`). A pick starts exactly as the dialog's
+  Start does, with the branch name the dialog would suggest, and the model and reasoning last chosen
+  in the dialog when they were for the same agent, else the agent's defaults. It doesn't change
+  `issue-agent.last`. Left click still opens the issue detail in the panel.
 - Commands: `github.prs` and `github.issues` switch the tab, `github.refresh` reloads,
   `github.sort` cycles the sort, `github.labels` opens or closes the label picker. Bind them in `keys.json` (for example `"cmd-shift-i": "github.issues"`) or run them with `herdr-app do github.issues`. They reach shown copies only.
 
@@ -120,8 +178,10 @@ titled in 11px `dim`):
   button in a cloned layout.
 - `mods/github/main.js` picks the view from `props().view` (the first `init` argument doesn't carry
   layout props): `panel.js` (the list, a plain class) or `ci.js` (the badge). Both import
-  `checks.js` (`summarizeChecks`, `finishedState`, `checksIcon`) and `open.js`: a mod can't import another mod's
+  `checks.js` (`summarizeChecks`, `checksSummaryText`, `finishedState`, `checksIcon`) and `open.js`: a mod can't import another mod's
   files, so one mod with two views shares them. The PR list adds `statusCheckRollup` to its fields.
+  `detail.js` is the detail the panel shows in place of the list. `format.js` is the review, merge,
+  diff and date words. `gh.js` runs `gh` and maps its errors. The description is `TextView.markdown`.
 - `mods/issue-agent/main.js`: the dialog, a `View` opened with `openOverlay({ mod: "issue-agent",
   kind: "dialog", width: 480, height: 620, props: { issue: { number, title, labels }, cwd, on } })`.
   `mod.json`: `{ "place": "none" }`. Uses `knownAgents({ on })` (installed only), `exec` for git and
@@ -141,8 +201,10 @@ titled in 11px `dim`):
 - `herdr` functions: `spaces`, `panes`, `focused` (to find the folder and machine), `exec`,
   `theme`, `nextCommand` (a loop started in `init` that reads `prs`, `issues` and `refresh`).
 - Programs: `gh pr list --state open --limit 50 --json
-  number,title,author,url,isDraft,updatedAt,reviewDecision,headRefName` and `gh issue list
-  --state open --limit 50 --json number,title,author,url,labels,updatedAt`, run in the folder
+  number,title,author,url,isDraft,createdAt,updatedAt,reviewDecision,headRefName,labels,statusCheckRollup`
+  and `gh issue list --state open --limit 50 --json number,title,author,url,labels,createdAt,updatedAt,milestone`,
+  plus `gh pr view <n> --json` (body, base, merge, diff, checks, assignees) and
+  `gh issue view <n> --json` (body, labels, assignees, milestone), run in the folder
   with `exec(..., { cwd, on })`; `open <url>` locally.
 - Reaches the network through `gh` and `git fetch`, runs programs and starts agents with a task.
   Writes worktrees under `~/.herdr/worktrees`. Reads nothing outside its own folder.
@@ -174,11 +236,13 @@ titled in 11px `dim`):
 - `herdr-app check mods/github` passes.
 - `cmd-shift-g` in a space inside a GitHub repo opens the popup with open PRs listed and the
   counts in both tabs.
-- Clicking a row opens that PR or issue in the browser.
+- Clicking a row shows that PR or issue's description in the panel. `Back` returns to the same list.
+- Command-click on a row, and `GitHub` on the detail, open it in the browser.
+- A PR detail lists each check. A check with an https details URL opens it.
 - Switching to a space that isn't a repo shows `Not a git repository`.
 - `herdr-app do github.issues` with the panel shown switches it to the Issues tab.
 - In a space on a PR's branch, the badge shows that PR's number and its checks; PR rows show `✓`/`✗`/`●`.
-- `node --test` passes (`summarizeChecks`, `finishedState`, `safeUrl`).
+- `node --test` passes (`summarizeChecks`, `checksSummaryText`, `finishedState`, `safeUrl`, review, merge and diff words).
 - `github.sort` once on a large repo shows its oldest open issues first, months old.
 - `github.labels` shows the repo's labels in their colors.
 - `herdr-app check mods/issue-agent` passes (it renders a placeholder without props).
