@@ -1,0 +1,42 @@
+{
+  "programs": {
+    "muse": {
+      "name": "Muse",
+      "icon": "icons/muse.svg",
+      "run": ["muse"],
+      "tint": true,
+      "tile": "#8a7040",
+      "color": "#ffffff"
+    },
+    "tau": {
+      "name": "Tau",
+      "icon": "personal-icons/tau.svg",
+      "run": ["tau"],
+      "tint": true,
+      "tile": "#8aa4b8",
+      "color": "#ffffff"
+    },
+    "flatt": {
+      "name": "Flatt",
+      "icon": "personal-icons/flatt.svg",
+      "run": ["flatt"],
+      "tint": true,
+      "tile": "#8fa38a",
+      "color": "#ffffff"
+    },
+    "rea": {
+      "name": "Rea",
+      "icon": "personal-icons/rea.svg",
+      "tint": true,
+      "tile": "#8fb3a8",
+      "color": "#ffffff"
+    },
+    "herdr-projects": {
+      "name": "Herdr Projects",
+      "icon": "personal-icons/herdr-projects.svg",
+      "tint": true,
+      "tile": "#c4a8b4",
+      "color": "#ffffff"
+    }
+  }
+}

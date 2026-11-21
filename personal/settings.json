@@ -1,0 +1,8 @@
+{
+  "terminal_line_height": 1.15,
+  "terminal_cell_width": 0.97,
+  "pane_scrollbars": false,
+  "worktrees": {
+    "directory": "~/.herdr/worktrees"
+  }
+}
