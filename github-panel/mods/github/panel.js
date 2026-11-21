@@ -265,7 +265,7 @@ export class Panel {
   // Right-click an issue: a menu that starts Claude Code or Codex on it without the dialog.
   quickAgent(issue) {
     const { cwd, on } = location();
-    openOverlay({ mod: "issue-agent", kind: "popup", width: 260, height: 112, props: { issue, cwd, on, quick: true } });
+    openOverlay({ mod: "issue-agent", kind: "popup", at: "pointer", width: 260, height: 112, props: { issue, cwd, on, quick: true } });
   }
 
   openDetail(item, cx) {
