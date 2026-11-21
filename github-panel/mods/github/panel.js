@@ -346,7 +346,11 @@ export class Panel {
   }
 
   render(cx) {
-    if (key() !== this.context) this.refresh(cx);
+    // A new repo reloads from a task: cx.notify() is refused during render.
+    if (key() !== this.context && !this.reloadQueued) {
+      this.reloadQueued = true;
+      cx.spawn(async (cx) => { this.reloadQueued = false; this.refresh(cx); });
+    }
     const t = theme(), list = this.items[this.tab];
     const root = this.frame(t);
     if (this.detailView) return root.child(this.detailView.render());
