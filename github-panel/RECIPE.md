@@ -157,7 +157,8 @@ with the agent's icon, `dim` when that agent isn't installed. While it starts th
   machine (Herdr's own worktree path, so the spaces sidebar nests it and Herdr's worktree dialog
   can remove it), branching from `origin/<default branch>` after a fetch, or from `HEAD` without a
   remote; an existing branch is checked out instead. Then `space.new` opens it with a tab named
-  `#12`, `argv` the agent's command plus its model and reasoning flags, and `task` one line asking
+  `#12`, `argv` the agent's command plus its model and reasoning flags (OpenCode v2 gets
+  `--prompt ""` too, as its bare command takes no `--model`), and `task` one line asking
   it to read the issue with `gh`, follow AGENTS.md/CLAUDE.md, run lint, typecheck and tests, push
   and open a PR with `Closes #12`, and not merge or deploy. The new space is shown.
 - The dialog remembers the last agent, model and reasoning (shared `issue-agent.last`) and caches
@@ -191,7 +192,7 @@ with the agent's icon, `dim` when that agent isn't installed. While it starts th
   | --- | --- | --- |
   | Claude Code | `fable`, `opus`, `sonnet`, `haiku` | `--model`, `--effort` (low…max) |
   | Codex | `codex debug models` (JSON; `visibility: "list"`, per-model reasoning levels and default) | `-m`, `-c model_reasoning_effort=` |
-  | OpenCode | `opencode models` (`provider/model` lines) | `--model` |
+  | OpenCode | `opencode models` (`provider/model` lines) | `--model`, with `--prompt ""` on v2 (the bare command has no `--model`) |
   | Cursor | `cursor-agent --list-models` (`id - Label` lines) | `--model` |
   | Pi | `pi --list-models` (table; thinking column `yes` gets off…max) | `--model`, `--thinking` |
   | Gemini | none: type one | `--model` |

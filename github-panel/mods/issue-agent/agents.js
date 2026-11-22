@@ -71,3 +71,12 @@ export function adapterFor(agent) {
   const program = agent.run?.[0]?.split("/").pop();
   return ADAPTERS[name] ?? ADAPTERS[ALIASES[program] ?? program] ?? null;
 }
+
+// The argv that starts an agent on a model and effort.
+// OpenCode v2 rejects --model on the bare command: it needs --prompt to boot the session.
+export function agentArgv(agent, model, effort) {
+  const flags = adapterFor(agent)?.flags(model, effort) ?? [];
+  const isOpenCode = agent.key === "opencode" || agent.run?.[0]?.split("/").pop() === "opencode";
+  if (isOpenCode && flags.length) return ["opencode", "--prompt", "", ...flags];
+  return [...agent.run, ...flags];
+}

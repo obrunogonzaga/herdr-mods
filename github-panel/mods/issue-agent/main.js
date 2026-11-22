@@ -5,7 +5,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { exec, run, props, closeOverlay, theme, knownAgents, home, shared, setShared } from "herdr";
-import { adapterFor } from "./agents.js";
+import { adapterFor, agentArgv } from "./agents.js";
 
 const LAST_CHOICE = "issue-agent.last";
 const MODEL_CACHE = "issue-agent.models";
@@ -148,7 +148,7 @@ export default class IssueAgent extends View {
   launch(agent, model, effort, branch, remember, cx) {
     if (this.busy || !this.issue.number) return;
     const { cwd, on } = props();
-    const argv = [...agent.run, ...(adapterFor(agent)?.flags(model, effort) ?? [])];
+    const argv = agentArgv(agent, model, effort);
     this.busy = true; this.error = null;
     cx.spawn(async (cx) => {
       try {
